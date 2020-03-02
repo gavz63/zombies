@@ -35,16 +35,33 @@ GRM.prototype.constructor = GRM;
 // you may access a list of players from this.game.players
 
 GRM.prototype.selectAction = function () {
+    let that = this;
+    let goalPoint = {x: 0, y: 0};
 
-    var action = { direction: { x: this.direction.x, y: this.direction.y }, throwRock: false, target: null };
-    var closest = 1000;
+    // We can't get more rocks
+    if (this.rocks > 1 || this.game.rocks.length === 0) {
+        goalPoint = {x: 400, y: 400}
+    } else {
+        let dist = Infinity;
+        this.game.rocks.forEach(function(rock) {
+            let rockDist = distance(that, rock);
+            if (rockDist < dist) {
+                goalPoint = rock;
+                dist = rockDist;
+            }
+        });
+    }
+    let dir = direction(goalPoint, this);
+
+    var action = { direction: { x: dir.x, y: dir.y }, throwRock: false, target: null };
+    var range = 200;
     var target = null;
 
     for (var i = 0; i < this.game.zombies.length; i++) {
         var ent = this.game.zombies[i];
         var dist = distance(ent, this);
-        if (dist < closest) {
-            closest = dist;
+        if (dist < range) {
+            range = dist;
             target = ent;
         }
     }
