@@ -1,4 +1,3 @@
-
 // find and replace CPM with your initials (i.e. ABC)
 // change this.name = "Your Chosen Name"
 
@@ -12,10 +11,10 @@ function GRM(game) {
     this.name = "Gavin Montes";
     this.color = "White";
     this.cooldown = 0;
-    this.direction = { x: randomInt(1600) - 800, y: randomInt(1600) - 800 };
+    this.direction = {x: randomInt(1600) - 800, y: randomInt(1600) - 800};
     Entity.call(this, game, this.radius + Math.random() * (800 - this.radius * 2), this.radius + Math.random() * (800 - this.radius * 2));
 
-    this.velocity = { x: 0, y: 0 };
+    this.velocity = {x: 0, y: 0};
 }
 
 GRM.prototype = new Entity();
@@ -39,32 +38,74 @@ GRM.prototype.selectAction = function () {
     let goalPoint = {x: 0, y: 0};
 
     // We can't get more rocks
-    if (this.rocks > 1 || this.game.rocks.length === 0) {
-        goalPoint = {x: 400, y: 400}
-    } else {
-        let dist = Infinity;
-        this.game.rocks.forEach(function(rock) {
-            let rockDist = distance(that, rock);
-            if (rockDist < dist) {
-                goalPoint = rock;
-                dist = rockDist;
+    if ((this.rocks > 1 || this.game.rocks.length === 0) && this.cooldown <= 0) {
+        let fastestZombie = {x: 400, y: 400, maxSpeed: 0};
+        that.game.zombies.forEach(function (zombie) {
+            if (zombie.maxSpeed > fastestZombie) {
+                fastestZombie = zombie;
             }
         });
-    }
-    let dir = direction(goalPoint, this);
-
-    var action = { direction: { x: dir.x, y: dir.y }, throwRock: false, target: null };
-    var range = 200;
-    var target = null;
-
-    for (var i = 0; i < this.game.zombies.length; i++) {
-        var ent = this.game.zombies[i];
-        var dist = distance(ent, this);
-        if (dist < range) {
-            range = dist;
-            target = ent;
+        goalPoint = fastestZombie;
+    } else {
+        if (this.rocks === 0 || this.cooldown > 0) {
+            let scareRange = 69;
+            for (let i = 0; i < this.game.zombies.length; i++) {
+                let ent = this.game.zombies[i];
+                let dist = distance(ent, this);
+                if (dist < scareRange) {
+                    scareRange = dist;
+                    ent.x > this.x ? goalPoint.x = this.x - ent.x : goalPoint.x = this.x + ent.x;
+                    ent.y > this.y ? goalPoint.y = this.y - ent.y : goalPoint.y = this.y + ent.y;
+                }
+            }
+        }
+        if (goalPoint.x === 0 && goalPoint.y === 0) {
+            let dist = Infinity;
+            this.game.rocks.forEach(function (rock) {
+                let rockDist = distance(that, rock);
+                if (rockDist < dist) {
+                    let safe = true;
+                    that.game.zombies.forEach(function (zombie) {
+                        // If zombie is between me and the rock
+                        if (((that.x < rock.x && zombie.x < rock.x && that.x < zombie.x) ||
+                            (that.x > rock.x && zombie.x > rock.x && that.x > zombie.x)) &&
+                            ((that.y < rock.y && zombie.y < rock.y && that.y < zombie.y) ||
+                                (that.y > rock.y && zombie.y > rock.y && that.y > zombie.y))) {
+                            safe = false;
+                        }
+                    });
+                    if (safe) {
+                        goalPoint = rock;
+                        dist = rockDist;
+                    }
+                }
+            });
         }
     }
+    this.direction = {x: goalPoint.x - this.x, y: goalPoint.y - this.y};
+    let action = {direction: {x: this.direction.x, y: this.direction.y}, throwRock: false, target: null};
+    let target = null;
+    let range = 185;
+
+    if (this.cooldown <= 0) {
+        for (let i = 0; i < this.game.zombies.length; i++) {
+            let ent = this.game.zombies[i];
+            let numTargetingEnt = 0;
+            this.game.players.forEach(function (player) {
+                if (player.action && player.action.target === ent) {
+                    numTargetingEnt++;
+                }
+            });
+            if (numTargetingEnt < 4) {
+                let dist = distance(ent, this);
+                if (dist < range) {
+                    range = dist;
+                    target = ent;
+                }
+            }
+        }
+    }
+
 
     if (target) {
         action.target = target;
@@ -135,7 +176,7 @@ GRM.prototype.update = function () {
         var ent = this.game.entities[i];
         if (ent !== this && this.collide(ent)) {
             if (ent.name !== "Zombie" && ent.name !== "Rock") {
-                var temp = { x: this.velocity.x, y: this.velocity.y };
+                var temp = {x: this.velocity.x, y: this.velocity.y};
                 var dist = distance(this, ent);
                 var delta = this.radius + ent.radius - dist;
                 var difX = (this.x - ent.x) / dist;
@@ -161,7 +202,7 @@ GRM.prototype.update = function () {
             }
         }
     }
-    
+
 
     if (this.cooldown === 0 && this.action.throwRock && this.rocks > 0) {
         this.cooldown = 1;
