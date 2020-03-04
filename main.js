@@ -1,4 +1,3 @@
-
 // GameBoard code below
 
 function distance(a, b) {

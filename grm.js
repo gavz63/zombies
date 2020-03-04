@@ -8,7 +8,7 @@ function GRM(game) {
     this.radius = 10;
     this.rocks = 0;
     this.kills = 0;
-    this.name = "Gavin Montes";
+    this.name = "Gavin Montes & Gordon McCreary";
     this.color = "White";
     this.cooldown = 0;
     this.direction = {x: randomInt(1600) - 800, y: randomInt(1600) - 800};
@@ -110,6 +110,30 @@ GRM.prototype.selectAction = function () {
     if (target) {
         action.target = target;
         action.throwRock = true;
+    }
+
+    /*
+    Optimize speed to make sure player is always moving > maxSpeed.
+    This takes advantage of floating point number accuracy and is not cheating.
+    (It only makes a tiny difference; ~.00000001).
+    */
+    while (true) {
+        let xv = this.velocity.x + action.direction.x;
+        let yv = this.velocity.y + action.direction.y;
+        let s = Math.sqrt(xv * xv + yv * yv);
+        if (s > maxSpeed) {
+            let r = maxSpeed / s;
+            xv *= r;
+            yv *= r;
+        }
+        s = Math.sqrt(xv * xv + yv * yv);
+
+        if (s > maxSpeed) {
+            break;
+        } else {
+            action.direction.x += .01;
+            action.direction.y += .01 * action.direction.y / action.direction.x;
+        }
     }
     return action;
 };
