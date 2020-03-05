@@ -34,7 +34,43 @@ GRM.prototype.constructor = GRM;
 // you may access a list of players from this.game.players
 
 GRM.prototype.selectAction = function () {
-    let that = this;
+    let playVect = {x: 0, y: 0};
+    this.game.zombies.forEach((z) => {
+        let dist = distance(z, this);
+        let scareDistance = z.maxSpeed / 1.5;
+        if (scareDistance < 35)  scareDistance = 35;
+        if (dist < scareDistance) {
+            playVect.x += (this.x - z.x) * (69 - dist);
+            playVect.y += (this.y - z.y) * (69 - dist);
+        }
+    });
+
+    if (this.rocks < 2) {
+        let min = Infinity;
+        let minR = null;
+        this.game.rocks.forEach((r) => {
+            let dist = distance(r, this);
+            let safe = true;
+            this.game.zombies.forEach((z) => {
+                let dist = distance(z, r);
+                if (dist < z.maxSpeed / 2) {
+                    safe = false; 
+                }
+            });
+            if (dist < min && safe) {
+                min = dist;
+                minR = r;
+            }
+        });
+        if (minR !== null) {
+            playVect.x += minR.x - this.x;
+            playVect.y += minR.y - this.y;
+        }
+    } else {
+        playVect.x += 400 - this.x;
+        playVect.y += 400 - this.y;
+    }
+    /*let that = this;
     let goalPoint = {x: 0, y: 0};
 
     // We can't get more rocks
@@ -82,7 +118,8 @@ GRM.prototype.selectAction = function () {
             });
         }
     }
-    this.direction = {x: goalPoint.x - this.x, y: goalPoint.y - this.y};
+    this.direction = {x: goalPoint.x - this.x, y: goalPoint.y - this.y};*/
+    this.direction = playVect;
     let action = {direction: {x: this.direction.x, y: this.direction.y}, throwRock: false, target: null};
     let target = null;
     let range = 185;
@@ -110,6 +147,25 @@ GRM.prototype.selectAction = function () {
     if (target) {
         action.target = target;
         action.throwRock = true;
+    }
+
+    /*
+    Don't run into walls!
+    */
+    if (this.x < 15 && this.velocity.x < 0) {
+        this.velocity.x = 0;
+    }
+    if (this.y < 15 && this.velocity.y < 0) {
+        this.velocity.y = 0;
+    }
+    if (this.x > 785 && this.velocity.x > 0) {
+        this.velocity.x = 0;
+    }
+    if (this.y > 785 && this.velocity.y > 0) {
+        this.velocity.y = 0;
+    }
+    if (this.velocity.x === 0 && this.velocity.y === 0) {
+        this.velocity = {x: 400 - this.x, y: 400 - this.y};
     }
 
     /*
