@@ -1,7 +1,6 @@
-// find and replace CPM with your initials (i.e. ABC)
-// change this.name = "Your Chosen Name"
-
-// only change code in selectAction function()
+/*
+Completed by Gavin Montes & Gordon McCreary
+*/
 
 function GRM(game) {
     this.player = 1;
@@ -34,42 +33,142 @@ GRM.prototype.constructor = GRM;
 // you may access a list of players from this.game.players
 
 GRM.prototype.selectAction = function () {
-    let playVect = {x: 0, y: 0};
+
+
+    // Avoid zombies.
+    let closeZomb = 2000;
+    let zombVect = {x: 0, y: 0};
     this.game.zombies.forEach((z) => {
         let dist = distance(z, this);
-        let scareDistance = z.maxSpeed / 1.5;
-        if (scareDistance < 35)  scareDistance = 35;
-        if (dist < scareDistance) {
-            playVect.x += (this.x - z.x) * (69 - dist);
-            playVect.y += (this.y - z.y) * (69 - dist);
-        }
+        if (dist < closeZomb) closeZomb = dist;
+        zombVect.x += (this.x - z.x) / Math.pow(dist, 5);
+        zombVect.y += (this.y - z.y) / Math.pow(dist, 5);
     });
+    zombVect = normalize(zombVect, 69 / closeZomb);
 
+
+    // Chase closest rock.
+    let playVect = {x: 400 - this.x, y: 400 - this.y};
     if (this.rocks < 2) {
         let min = Infinity;
         let minR = null;
         this.game.rocks.forEach((r) => {
             let dist = distance(r, this);
-            let safe = true;
-            this.game.zombies.forEach((z) => {
-                let dist = distance(z, r);
-                if (dist < z.maxSpeed / 2) {
-                    safe = false; 
-                }
-            });
-            if (dist < min && safe) {
+            if (dist < min) {
                 min = dist;
                 minR = r;
             }
         });
         if (minR !== null) {
-            playVect.x += minR.x - this.x;
-            playVect.y += minR.y - this.y;
+            playVect.x = (minR.x - this.x);
+            playVect.y = (minR.y - this.y);
         }
     } else {
-        playVect.x += 400 - this.x;
-        playVect.y += 400 - this.y;
+        let min = Infinity;
+        let minZ = null;
+        this.game.zombies.forEach((z) => {
+            let dist = distance(z, this);
+            if (dist < min) {
+                min = dist;
+                minZ = z;
+            }
+        });
+        if (minZ !== null) {
+            playVect.x = (minZ.x - this.x);
+            playVect.y = (minZ.y - this.y);
+        }
     }
+    playVect = normalize(playVect);
+
+
+    // Combine chasing rocks and avoiding zombies.
+    playVect.x += zombVect.x;
+    playVect.y += zombVect.y;
+
+
+    // Prepare the return value.
+    this.direction = playVect;
+    let action = {direction: {x: this.direction.x, y: this.direction.y}, throwRock: false, target: null};
+    let target = null;
+    let range = 125;
+
+
+    // Find the next victim!
+    if (this.cooldown <= 0) {
+        for (let i = 0; i < this.game.zombies.length; i++) {
+            let ent = this.game.zombies[i];
+            let numTargetingEnt = 0;
+            this.game.players.forEach(function (player) {
+                if (player.action && player.action.target === ent) {
+                    numTargetingEnt++;
+                }
+            });
+            if (numTargetingEnt < 4) {
+                let dist = distance(ent, this);
+                if (dist < range) {
+                    range = dist;
+                    target = ent;
+                }
+            }
+        }
+    }
+
+
+    // Throw a rock!
+    if (target) {
+        action.target = target;
+        action.throwRock = true;
+    }
+
+    
+    /*
+    Don't run into walls!
+    */
+    if (this.x < 15 && this.velocity.x < 0) {
+        this.velocity.x = 0;
+    }
+    if (this.y < 15 && this.velocity.y < 0) {
+        this.velocity.y = 0;
+    }
+    if (this.x > 785 && this.velocity.x > 0) {
+        this.velocity.x = 0;
+    }
+    if (this.y > 785 && this.velocity.y > 0) {
+        this.velocity.y = 0;
+    }
+    if (this.velocity.x === 0 && this.velocity.y === 0) {
+        this.velocity = {x: 400 - this.x, y: 400 - this.y};
+    }
+
+    /*
+    Optimize speed to make sure player is always moving > maxSpeed.
+    This takes advantage of floating point number accuracy and is not cheating.
+    (It only makes a tiny difference; ~.00000001).
+    */
+    action.direction.x *= 200;
+    action.direction.y *= 200;
+    while (true) {
+        let xv = this.velocity.x + action.direction.x;
+        let yv = this.velocity.y + action.direction.y;
+        let s = Math.sqrt(xv * xv + yv * yv);
+        if (s > maxSpeed) {
+            let r = maxSpeed / s;
+            xv *= r;
+            yv *= r;
+        }
+        s = Math.sqrt(xv * xv + yv * yv);
+
+        if (s > maxSpeed) {
+            break;
+        } else {
+            action.direction.x += .01;
+            action.direction.y += .01 * action.direction.y / action.direction.x;
+        }
+    }
+    return action;
+
+
+    // Previous movement code.
     /*let that = this;
     let goalPoint = {x: 0, y: 0};
 
@@ -119,79 +218,6 @@ GRM.prototype.selectAction = function () {
         }
     }
     this.direction = {x: goalPoint.x - this.x, y: goalPoint.y - this.y};*/
-    this.direction = playVect;
-    let action = {direction: {x: this.direction.x, y: this.direction.y}, throwRock: false, target: null};
-    let target = null;
-    let range = 185;
-
-    if (this.cooldown <= 0) {
-        for (let i = 0; i < this.game.zombies.length; i++) {
-            let ent = this.game.zombies[i];
-            let numTargetingEnt = 0;
-            this.game.players.forEach(function (player) {
-                if (player.action && player.action.target === ent) {
-                    numTargetingEnt++;
-                }
-            });
-            if (numTargetingEnt < 4) {
-                let dist = distance(ent, this);
-                if (dist < range) {
-                    range = dist;
-                    target = ent;
-                }
-            }
-        }
-    }
-
-
-    if (target) {
-        action.target = target;
-        action.throwRock = true;
-    }
-
-    /*
-    Don't run into walls!
-    */
-    if (this.x < 15 && this.velocity.x < 0) {
-        this.velocity.x = 0;
-    }
-    if (this.y < 15 && this.velocity.y < 0) {
-        this.velocity.y = 0;
-    }
-    if (this.x > 785 && this.velocity.x > 0) {
-        this.velocity.x = 0;
-    }
-    if (this.y > 785 && this.velocity.y > 0) {
-        this.velocity.y = 0;
-    }
-    if (this.velocity.x === 0 && this.velocity.y === 0) {
-        this.velocity = {x: 400 - this.x, y: 400 - this.y};
-    }
-
-    /*
-    Optimize speed to make sure player is always moving > maxSpeed.
-    This takes advantage of floating point number accuracy and is not cheating.
-    (It only makes a tiny difference; ~.00000001).
-    */
-    while (true) {
-        let xv = this.velocity.x + action.direction.x;
-        let yv = this.velocity.y + action.direction.y;
-        let s = Math.sqrt(xv * xv + yv * yv);
-        if (s > maxSpeed) {
-            let r = maxSpeed / s;
-            xv *= r;
-            yv *= r;
-        }
-        s = Math.sqrt(xv * xv + yv * yv);
-
-        if (s > maxSpeed) {
-            break;
-        } else {
-            action.direction.x += .01;
-            action.direction.y += .01 * action.direction.y / action.direction.x;
-        }
-    }
-    return action;
 };
 
 // do not change code beyond this point
@@ -311,3 +337,15 @@ GRM.prototype.draw = function (ctx) {
     ctx.fill();
     ctx.closePath();
 };
+
+function normalize(vect, len = 1) {
+    let l = Math.sqrt(vect.x * vect.x + vect.y * vect.y) / len;
+    if (l === 0 || len === 0) {
+        vect.x = 0;
+        vect.y = 0;
+        return vect;
+    }
+    vect.x /= l;
+    vect.y /= l;
+    return vect;
+}
